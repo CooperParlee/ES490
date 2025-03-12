@@ -70,12 +70,12 @@ for i in range(qty):
 
 fig, ax = plt.subplots();
 
-ax.plot(reductions, comb_temperatures);
-ax.xaxis.set_major_formatter(mtick.PercentFormatter(xmax=1.0));
+ax.plot(comb_temperatures, reductions);
+ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1.0));
 
-plt.title("HW2.1: Kerosene Combustion Temperature to Achieve NOx Reduction");
-plt.xlabel("NOx Reduction [%]");
-plt.ylabel("Combustion Temperature [\N{DEGREE SIGN}K]");
+plt.title("HW2.1: NOx Reduction as Function of Temperature");
+plt.ylabel("NOx Reduction [%]");
+plt.xlabel("Combustion Temperature [\N{DEGREE SIGN}K]");
 
 print(f"Produced graph of kerosene combustion temperatures. Function completion took {time.time()-start} seconds.");
 
@@ -199,7 +199,7 @@ def goldenMax (f, xl, xu, i=0, tol=0.0001):
     # Then run the algorithm again
     return goldenMax(f, xl, xu, i);
 
-max_defx = goldenMax(deflect, 0, l);
+max_defx = goldenMax(deflect, 0, l, tol=1E-14);
 max_defy = deflect(max_defx);
 
 plt.scatter(max_defx, max_defy, marker="x", s=50, color = "black");
