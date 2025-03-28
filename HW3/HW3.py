@@ -74,6 +74,8 @@ def generateSimpArray(n):
     Returns:
         [n]: array of length n coefficients
     """
+    if n % 2 == 0:
+        raise ValueError("n parameter to generateSimpArray should be odd");
     simp = np.full(n, 1);
     for i in range(1, n-1):
         if i % 2 != 0: # If array index is odd, set array 4.
@@ -108,6 +110,8 @@ import SolarEnergy as Solar
 
 print ("-=-=- 3.2 -=-=- ")
 
+# Define some default parameters:
+
 w = 1.361;      # [kW/m2]
 beta = 20;      # [Deg]
 gamma = 0;      # [Deg]
@@ -126,8 +130,15 @@ plt.ylabel("Energy Potential [kW/m^2]");
 plt.xlabel("Clock Time [Hours]");
 # %% HW3.2 Integration: Yearly Potential 
 
-num_samples = 24; # 24 hours
-dx = 1/60; # 60 seconds per minute
+num_samples = 501; # in each 24 hours
+
+def dayEnergy (day, times, beta, w=w, gamma=gamma, lat=lat, long=long, lst=lst):
+    num = len(times);
+    simpArr = generateSimpArray(num);
+    dt = 24/(num - 1);
+
+    return np.sum(simpArr * Solar.SolarEnergy(w, beta, gamma, lat, long, lst, day, times) * dt / 3);
+
 
 days = np.arange(1, 366, 1);
 times = np.linspace(0, 24, num_samples);
@@ -135,15 +146,14 @@ times = np.linspace(0, 24, num_samples);
 daily_energy = np.zeros([365]);
 
 for day in days:
-    # Calculate total energy for 1 day:
-    daily_energy[day-1] = np.sum(Solar.SolarEnergy(w, beta, gamma, lat, long, lst, day, times) * dx)
+    daily_energy[day - 1] = dayEnergy(day, times, beta);
 
 print(f"Energy 1yr: {np.sum(daily_energy)} KWh/m^2");
 
 # %% HW3.2 Daily Energy Plot
 plt.plot (days, daily_energy);
 plt.title("HW3.2: Daily Solar Energy Potential");
-plt.ylabel("Energy Potential [kJ/m^2]");
+plt.ylabel("Energy Potential [kWh/m^2]");
 plt.xlabel("Day of Year");
 
 # %% HW3.2 Create Function
@@ -157,7 +167,7 @@ def totalEnergy(w, beta, gamma, lat, long, lst, days):
     
     for i in range(0, len(days), 1):
         day = days[i];
-        daily_energy[i] = np.sum(Solar.SolarEnergy(w, beta, gamma, lat, long, lst, day, times) * dx)
+        daily_energy[i] = dayEnergy(day, times, beta);
     return np.sum(daily_energy);
 #%% HW3.2 Optimize Beta
 from scipy.optimize import minimize_scalar;
@@ -212,3 +222,5 @@ plt.xlabel(f"Solar Panel Incline Angle \u03B2 [\N{DEGREE SIGN}]");
 plt.ylabel("Energy Potential [KWh/m^2]");
 
 
+
+# %%
