@@ -69,9 +69,9 @@ m2 = 10000; # [kg]
 m3 =  8000; # [kg]
 
 coeffMatrix = [
-    [-k1-k2, k2,    0],    
-    [k1,    -k2-k3, k3],
-    [0,      k3,   -k3],    
+    [(-k1-k2)/m1, k2/m1,    0],    
+    [k1/m2,    (-k2-k3)/m2, k3/m2],
+    [0,      k3/m3,   -k3/m3],    
 ];
 
 eigen2 = np.linalg.eig(coeffMatrix);
@@ -83,7 +83,8 @@ print(eigen2.eigenvalues);
 print("Eigenvector Matrix");
 print(eigen2.eigenvectors);
 
-f1, f2, f3 = np.sqrt(abs(eigen2.eigenvalues));
+# Need to divide by 2pi to convert rad/s to frequency
+f1, f2, f3 = np.sqrt(abs(eigen2.eigenvalues))/2/np.pi;
 print("Characteristic Frequencies: ")
 print(str(f1) + " " + str(f2) + " " + str(f3));
 
@@ -107,5 +108,3 @@ plt.plot(np.append([0], w[:,0]), [0, 1, 2, 3])
 plt.title(f'Fundamental Freq {str(f1)[:5]} (Hz)', fontweight='bold', fontsize=12)
 
 plt.show();
-
-# %%
