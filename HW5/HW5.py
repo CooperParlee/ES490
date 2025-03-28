@@ -59,6 +59,11 @@ k1 = 3000; # [kN/m]
 k2 = 2400; # [kN/m]
 k3 = 1800; # [kN/m]
 
+# Convert all kN to N
+k1 *= 1000; 
+k2 *= 1000; 
+k3 *= 1000; 
+
 m1 = 12000; # [kg]
 m2 = 10000; # [kg]
 m3 =  8000; # [kg]
@@ -82,24 +87,24 @@ f1, f2, f3 = np.sqrt(abs(eigen2.eigenvalues));
 print("Characteristic Frequencies: ")
 print(str(f1) + " " + str(f2) + " " + str(f3));
 
-#%% HW 5.2 Fundimental Frequency Plotting
+#%% HW 5.2 Fundamental Frequency Plotting
 
 fig = plt.figure()
 plt.subplot(1, 3, 1)
 
 # Format the graph window to not be too small
 window = fig.canvas.get_tk_widget().master; 
-window.minsize(width=800, height=600);
+window.minsize(width=1200, height=800);
 w = eigen2.eigenvectors;
 
 plt.plot(np.append([0], w[:,2]), [0, 1, 2, 3])
-plt.title(f'Fundamental Freq {str(f1)[:5]} (Hz)', fontweight='bold', fontsize=12)
+plt.title(f'Fundamental Freq {str(f3)[:5]} (Hz)', fontweight='bold', fontsize=12)
 plt.subplot(1, 3, 2)
 plt.plot(np.append([0], w[:,1]), [0, 1, 2, 3])
 plt.title(f'Fundamental Freq {str(f2)[:5]} (Hz)', fontweight='bold', fontsize=12)
 plt.subplot(1, 3, 3)
 plt.plot(np.append([0], w[:,0]), [0, 1, 2, 3])
-plt.title(f'Fundamental Freq {str(f3)[:5]} (Hz)', fontweight='bold', fontsize=12)
+plt.title(f'Fundamental Freq {str(f1)[:5]} (Hz)', fontweight='bold', fontsize=12)
 
 plt.show();
 
