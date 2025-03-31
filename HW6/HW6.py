@@ -165,7 +165,7 @@ ax[1].set_xlabel("Time [s]");
 fig.subplots_adjust(hspace=0.4);
 plt.show();
 
-# Maximum Amplitude
+# Find the max amplitude
 
 vList = np.linspace(1, 30, 100); # [m/s] array of velocities to test
 xMax = np.empty_like(vList); # [m] array of maximum displacements
@@ -186,5 +186,20 @@ vMax = vList[np.where(xMax == np.max(xMax))[0]][0];
 wMax = roadFreq(vMax, l);
 print(f"Maximum oscilation occurs at: {vMax} m/s");
 print(f"System resonant frequency: {wMax} rad/s");
+
+plt.show();
+
+#%% 6.2.3 Different Initial Conditions
+bumpDyn = suspensionDyn(t, x0=0.2, w=w0);
+
+fig2, ax2 = plt.subplots(2);
+
+fig2.suptitle(f"6.2.3 Suspension Dynamics: x0=0.2m")
+ax2[0].plot(t, bumpDyn[0], color = "blue");
+ax2[0].set_title("Suspension Position [m]");
+ax2[1].plot(t, bumpDyn[1], color = "red");
+ax2[1].set_title("Suspension Velocity [m/s]");
+ax2[1].set_xlabel("Time [s]");
+fig2.subplots_adjust(hspace=0.4);
 
 plt.show();
