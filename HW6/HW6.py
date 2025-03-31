@@ -54,7 +54,7 @@ c = 6000; # [Ns/m] damping constant of the suspension
 y0 = 0.1; # [m] road roughness amplitude
 l = 5; #    [m] road roughness wavelength
 
-v = 25; #   [m/s] car velocity for 6.2.1
+v0 = 25; #   [m/s] car velocity for 6.2.1
 x0 = 0; #   [m] initial car bounce height
 u0 = 0; #   [m] initial car bounce velocity
 dt = 0.001; # [s] time step
@@ -89,7 +89,7 @@ def yRough (y0, t, w):
 def dRough(y0, t, w):
     return y0*w*np.cos(w*t);
 
-w0 = roadFreq(v, l);
+w0 = roadFreq(v0, l);
 
 def dxdt (t, x, u,
                   k=k, m=m, c=c, y0=y0, w=w0):
@@ -117,6 +117,19 @@ def dxdt (t, x, u,
     return k/m*y + c/m * y_dot - c/m * u - k/m * x, u;
 
 def suspensionDyn (t, x0=x0, u0=u0, w=w0):
+    """Return an array of displacement and velocities given the provided system arguments.
+
+    Args:
+        t (np.float64): array of times for the suspension calculations.
+        x0 (float, optional): initial displacement condition. Defaults to x0.
+        u0 (float, optional): initial velocity condition. Defaults to u0.
+        w (float, optional): system frequency condition in rad/s. Defaults to w0.
+
+    Returns:
+        tuple[ np.float64, np.float64 ]:
+            - x (np.ndarray): Displacement of the car over time (m).
+            - u (np.ndarray): Velocity of the car over time (m/s).
+    """
     u = np.empty_like(t);
     x = np.empty_like(t);
     #a = np.empty_like(t);
@@ -126,7 +139,6 @@ def suspensionDyn (t, x0=x0, u0=u0, w=w0):
     u[0] = u0;
 
     for i in range(len(t)-1):
-        # TODO: Debug this because you were tired when you wrote it.
 
         k1_u, k1_x = dxdt(t[i], x[i], u[i], w=w);
         k2_u, k2_x = dxdt(t[i] + dt/2, x[i] + dt/2 * k1_x, u[i] + dt/2 * k1_u, w=w);
@@ -143,7 +155,7 @@ susP, susV = suspensionDyn(t);
 
 fig, ax = plt.subplots(2);
 
-fig.suptitle(f"Suspension Dynamics: k={k} N/m, c = {c} Ns/m")
+fig.suptitle(f"6.2.1 Suspension Dynamics: k={k} N/m, c = {c} Ns/m")
 ax[0].plot(t, susP, color = "blue");
 ax[0].set_title("Suspension Position [m]");
 ax[1].plot(t, susV, color = "red");
@@ -151,4 +163,28 @@ ax[1].set_title("Suspension Velocity [m/s]");
 ax[1].set_xlabel("Time [s]");
 
 fig.subplots_adjust(hspace=0.4);
+plt.show();
+
+# Maximum Amplitude
+
+vList = np.linspace(1, 30, 100); # [m/s] array of velocities to test
+xMax = np.empty_like(vList); # [m] array of maximum displacements
+
+for i in range(len(vList)):
+    v = vList[i];
+    wi = roadFreq(v, l);
+
+    dyn = suspensionDyn(t, w=wi);
+    xMax[i] = np.max(np.abs(dyn[0]));
+
+plt.figure();
+plt.plot(roadFreq(vList, l), xMax);
+plt.title("6.2.2 Maximum Displacement Amplitude as a function of Angular Velocity");
+plt.xlabel("System Frequency [rad/s]");
+plt.ylabel("Maximum Displacement [m]");
+vMax = vList[np.where(xMax == np.max(xMax))[0]][0];
+wMax = roadFreq(vMax, l);
+print(f"Maximum oscilation occurs at: {vMax} m/s");
+print(f"System resonant frequency: {wMax} rad/s");
+
 plt.show();
