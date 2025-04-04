@@ -203,3 +203,13 @@ ax2[1].set_xlabel("Time [s]");
 fig2.subplots_adjust(hspace=0.4);
 
 plt.show();
+
+#%% 6.3 Chemical Reaction
+def derivatives (k1, k2, k3, c_O, c_NO, c_NO2, c_hv, c_O2, c_M, c_O3):
+    dNO2_i = -k1*c_NO2 + k3*c_NO*c_O3;
+    dO_i = k1*c_NO2*c_hv - k2*c_O*c_O2*c_M;
+    dNO_i = k1*c_NO2 - k3*c_NO*c_O3;
+    dO3_i = k2*c_O*c_O2*c_M - k3*c_NO*c_O3;
+
+    return np.array([dNO2_i, dO_i, dNO_i, dO3_i]);
+    
