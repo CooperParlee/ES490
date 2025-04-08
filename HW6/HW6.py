@@ -205,11 +205,58 @@ fig2.subplots_adjust(hspace=0.4);
 plt.show();
 
 #%% 6.3 Chemical Reaction
-def derivatives (k1, k2, k3, c_O, c_NO, c_NO2, c_hv, c_O2, c_M, c_O3):
+def derivatives (k_rates, c, c_M, c_hv=1):
+    k1, k2, k3 = k_rates;
+    
+    c_NO, c_NO2, c_O, c_O2, c_O3 = c;
+
     dNO2_i = -k1*c_NO2 + k3*c_NO*c_O3;
     dO_i = k1*c_NO2*c_hv - k2*c_O*c_O2*c_M;
     dNO_i = k1*c_NO2 - k3*c_NO*c_O3;
     dO3_i = k2*c_O*c_O2*c_M - k3*c_NO*c_O3;
+    dO2_i =-dO3_i+dNO2_i;
 
-    return np.array([dNO2_i, dO_i, dNO_i, dO3_i]);
+    return np.array([dNO_i, dNO2_i, dO_i, dO2_i, dO3_i]);
     
+# Define initial conditions
+
+NO_0 = 0.1; #   [ppm] initial NO concentration
+NO2_0 = 0.005;# [ppm] initial NO2 concentration
+O_0 = 0;#       [ppm] initial oxygen radical concentration
+O2_0 = 2.1E5;#  [ppm] initial diatomic oxygen concentration
+O3_0 = 0.1;#    [ppm] initial ozone concentration
+
+M_0 = 1E6;#     [ppm] spectator M concentration
+c1 = 0.008;#    [/s]
+c2 = 3.63E-7;#  [/ppm^2-s]   
+c3 = 0.4;#      [/ppm-s]   
+
+# Define an array containing each of the constituent concentrations
+dt = 1E-30;
+t = np.arange(0, 1, dt);
+c_temporal = np.zeros((5, len(t)));
+k_rates = np.array([c1, c2, c3])
+
+c_temporal[:, 0] = [
+    NO_0,
+    NO2_0,
+    O_0,
+    O2_0,
+    O3_0,    
+];
+
+for i in range(0, len(t)-1):
+    k1 = derivatives(k_rates, c_temporal[:, i], M_0);
+    k2 = derivatives(k_rates, c_temporal[:, i] + k1 * dt/2, M_0);
+    k3 = derivatives(k_rates, c_temporal[:, i] + k2 * dt/2, M_0);
+    k4 = derivatives(k_rates, c_temporal[:, i] + k3 * dt, M_0);
+
+    c_temporal[:, i+1] = c_temporal[:, i] + (k1 + 2*k2 + 2*k3 + k4)/6;
+
+plt.plot(t, c_temporal[0, :], label="NO")
+plt.plot(t, c_temporal[1, :], label=f"$NO_2$")
+plt.plot(t, c_temporal[2, :], label="O")
+plt.plot(t, c_temporal[3, :], label=f"$O_2$")
+plt.plot(t, c_temporal[4, :], label=f"$O_3s$")
+
+# %%
