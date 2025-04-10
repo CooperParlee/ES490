@@ -41,7 +41,7 @@ plt.xlabel("Time (minutes)");
 plt.ylabel(r"Mole Ratio $S=\frac{mol_{MDO}}{mol_{HFO}}$");
 plt.legend();
 
-plt.show();
+#plt.show();
 
 i = np.where(s_RK4 <= 0.001)[0][0]; # Search the RK4 array for the first index where s is 0.1%
 print(f"S=0.1% MDO: {str(t[i])} minutes");
@@ -163,7 +163,7 @@ ax[1].set_title("Suspension Velocity [m/s]");
 ax[1].set_xlabel("Time [s]");
 
 fig.subplots_adjust(hspace=0.4);
-plt.show();
+#plt.show();
 
 # Find the max amplitude
 
@@ -204,19 +204,7 @@ fig2.subplots_adjust(hspace=0.4);
 
 plt.show();
 
-#%% 6.3 Chemical Reaction
-def derivatives (k_rates, c, c_M, c_hv=1):
-    k1, k2, k3 = k_rates;
-    
-    c_NO, c_NO2, c_O, c_O2, c_O3 = c;
-
-    dNO2_i = -k1*c_NO2 + k3*c_NO*c_O3;
-    dO_i = k1*c_NO2*c_hv - k2*c_O*c_O2*c_M;
-    dNO_i = k1*c_NO2 - k3*c_NO*c_O3;
-    dO3_i = k2*c_O*c_O2*c_M - k3*c_NO*c_O3;
-    dO2_i =-dO3_i+dNO2_i;
-
-    return np.array([dNO_i, dNO2_i, dO_i, dO2_i, dO3_i]);
+#%% 6.3 NOx Reaction with an Explicit Solver
     
 # Define initial conditions
 
@@ -232,9 +220,9 @@ c2 = 3.63E-7;#  [/ppm^2-s]
 c3 = 0.4;#      [/ppm-s]   
 
 # Define an array containing each of the constituent concentrations
-dt = 1E-30;
+dt = 1E-4;
 t = np.arange(0, 1, dt);
-c_temporal = np.zeros((5, len(t)));
+c_temporal = np.zeros((6, len(t)));
 k_rates = np.array([c1, c2, c3])
 
 c_temporal[:, 0] = [
@@ -242,21 +230,124 @@ c_temporal[:, 0] = [
     NO2_0,
     O_0,
     O2_0,
-    O3_0,    
+    O3_0,
+    M_0,   
 ];
 
+def derivatives (c, k_rates=k_rates, c_hv=1):
+    k1, k2, k3 = k_rates;
+    
+    c_NO, c_NO2, c_O, c_O2, c_O3, c_M = c;
+
+    dNO_i = k1*c_NO2 - k3*c_NO*c_O3;
+    dNO2_i = -k1*c_NO2 + k3*c_NO*c_O3;
+    dO_i = k1*c_NO2*c_hv - k2*c_O*c_O2*c_M;
+    dO3_i = k2*c_O*c_O2*c_M - k3*c_NO*c_O3;
+    dO2_i =-dO3_i+dNO2_i;
+
+    return np.array([dNO_i, dNO2_i, dO_i, dO2_i, dO3_i, 0]);
+
 for i in range(0, len(t)-1):
-    k1 = derivatives(k_rates, c_temporal[:, i], M_0);
-    k2 = derivatives(k_rates, c_temporal[:, i] + k1 * dt/2, M_0);
-    k3 = derivatives(k_rates, c_temporal[:, i] + k2 * dt/2, M_0);
-    k4 = derivatives(k_rates, c_temporal[:, i] + k3 * dt, M_0);
+    k1 = derivatives(c_temporal[:, i]);
+    k2 = derivatives(c_temporal[:, i] + k1 * dt/2);
+    k3 = derivatives(c_temporal[:, i] + k2 * dt/2);
+    k4 = derivatives(c_temporal[:, i] + k3 * dt);
 
     c_temporal[:, i+1] = c_temporal[:, i] + (k1 + 2*k2 + 2*k3 + k4)/6;
 
-plt.plot(t, c_temporal[0, :], label="NO")
-plt.plot(t, c_temporal[1, :], label=f"$NO_2$")
-plt.plot(t, c_temporal[2, :], label="O")
-plt.plot(t, c_temporal[3, :], label=f"$O_2$")
-plt.plot(t, c_temporal[4, :], label=f"$O_3s$")
+plt.plot(t, c_temporal[0, :], label="NO");
+plt.plot(t, c_temporal[1, :], label=f"$NO_2$");
+plt.plot(t, c_temporal[2, :], label="O");
+plt.plot(t, c_temporal[3, :], label=f"$O_2$");
+plt.plot(t, c_temporal[4, :], label=f"$O_3s$");
+
+plt.show();
+
+# Unfortunately, as we can see with this graph, the function is not stable for reasonably
+# small step sizes. This means that it is necessary to use an implicit method instead.
+
+# %% Radau IIA Method
+
+# These coefficients have been determined in the book Solving Ordinary Differential Equations II
+# by Hairer and Wanner, 1996. See here:
+# https://link.springer.com/book/10.1007/978-3-642-05221-7
+
+# Redefine c_temporal matrix with the initial conditions given.
+c_temporal[:, 0] = [
+    NO_0,
+    NO2_0,
+    O_0,
+    O2_0,
+    O3_0,
+    M_0,   
+];
+
+
+def radau_iia_step (derivatives, c_0, dt, tol=1E-8, max_runs=10):
+    c = np.array([ (4 - np.sqrt(6))/10, (4 + np.sqrt(6))/10, 1.0 ]);
+    b = np.array([(16 - np.sqrt(6))/36, (16 + np.sqrt(6))/36, 1/9], dtype=float);
+
+    A = np.array([
+        [ 0.19681547722366, -0.06553542585020,  0.02377097434822],
+        [ 0.39442431473909,  0.29207341166523, -0.04154875212599],
+        [ 0.37640306270047,  0.51248582618842,  0.11111111111111]
+    ]);
+    
+    s = 3; # Number of Radau stages
+    d = c_0.shape;
+
+    # Stage derivatives K: shape (s, *c.shape)
+    K = np.zeros((s,) + d);
+    F = np.zeros_like(K);
+
+    # Initial guess: repeat the current derivative
+    for i in range(s):
+        K[i] = derivatives(c_0);
+
+    for _ in range(max_runs):
+        for i in range(s):
+            c_i = c_0.copy();
+            for j in range(s):
+                c_i += dt * A[i, j] * K[j];
+            F[i] = derivatives(c_i);
+        error = np.linalg.norm(F-K);
+        if error < tol:
+            break;
+        else:
+            print ("Warning: Newton did not converge");
+        K[:] = F * 0.5 + K * 0.5;
+    c_new = c_0.copy();
+    for i in range(s):
+        c_new += dt * b[i] * K[i];
+    return c_new;
+
+def radau_iia_solve (derivatives, c, c_M, t, dt):
+    """This function programmatically iterates through an array of times, t, given an initial concentration
+    matrix, c and spectator ion concentration, c_M.
+
+
+    Args:
+        derivatives (function): derivative function for the gas concentrations
+        c (np.array): initial concentration array
+        c_M (float): spectator ion concentration
+        t (np.array): array of times
+        dt (float): timestep
+    """
+    c_temporal = np.zeros((6, len(t)));
+    c_temporal[:, 0] = c;
+
+    for i in range (1, len(t)):
+        c_temporal[:, i] = radau_iia_step(derivatives, c_temporal[:, i-1], c_M, dt);
+    return c_temporal;
+
+c_temporal = radau_iia_solve(derivatives, c_temporal[:, 0], M_0, t, dt);
+
+plt.plot(t, c_temporal[0, :], label="NO");
+plt.plot(t, c_temporal[1, :], label=f"$NO_2$");
+plt.plot(t, c_temporal[2, :], label="O");
+plt.plot(t, c_temporal[3, :], label=f"$O_2$");
+plt.plot(t, c_temporal[4, :], label=f"$O_3s$");
+
+plt.show();
 
 # %%
