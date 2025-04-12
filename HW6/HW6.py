@@ -190,7 +190,7 @@ print(f"System resonant frequency: {wMax} rad/s");
 plt.show();
 
 #%% 6.2.3 Different Initial Conditions
-bumpDyn = suspensionDyn(t, x0=0.2, w=w0);
+bumpDyn = suspensionDyn(t, x0=0.2, w=0);
 
 fig2, ax2 = plt.subplots(2);
 
@@ -234,7 +234,7 @@ c_temporal[:, 0] = [
     M_0,   
 ];
 
-def derivatives (c, k_rates=k_rates, c_hv=1):
+def derivatives (t, c, k_rates=k_rates, c_hv=1):
     k1, k2, k3 = k_rates;
     
     c_NO, c_NO2, c_O, c_O2, c_O3, c_M = c;
@@ -248,10 +248,10 @@ def derivatives (c, k_rates=k_rates, c_hv=1):
     return np.array([dNO_i, dNO2_i, dO_i, dO2_i, dO3_i, 0]);
 
 for i in range(0, len(t)-1):
-    k1 = derivatives(c_temporal[:, i]);
-    k2 = derivatives(c_temporal[:, i] + k1 * dt/2);
-    k3 = derivatives(c_temporal[:, i] + k2 * dt/2);
-    k4 = derivatives(c_temporal[:, i] + k3 * dt);
+    k1 = derivatives(t[i], c_temporal[:, i]);
+    k2 = derivatives(t[i], c_temporal[:, i] + k1 * dt/2);
+    k3 = derivatives(t[i], c_temporal[:, i] + k2 * dt/2);
+    k4 = derivatives(t[i], c_temporal[:, i] + k3 * dt);
 
     c_temporal[:, i+1] = c_temporal[:, i] + (k1 + 2*k2 + 2*k3 + k4)/6;
 
@@ -273,6 +273,9 @@ plt.show();
 # https://link.springer.com/book/10.1007/978-3-642-05221-7
 
 # Redefine c_temporal matrix with the initial conditions given.
+
+import butcher;
+
 c_temporal[:, 0] = [
     NO_0,
     NO2_0,
@@ -283,64 +286,61 @@ c_temporal[:, 0] = [
 ];
 
 
-def radau_iia_step (derivatives, c_0, dt, tol=1E-8, max_runs=10):
-    c = np.array([ (4 - np.sqrt(6))/10, (4 + np.sqrt(6))/10, 1.0 ]);
-    b = np.array([(16 - np.sqrt(6))/36, (16 + np.sqrt(6))/36, 1/9], dtype=float);
 
-    A = np.array([
-        [ 0.19681547722366, -0.06553542585020,  0.02377097434822],
-        [ 0.39442431473909,  0.29207341166523, -0.04154875212599],
-        [ 0.37640306270047,  0.51248582618842,  0.11111111111111]
-    ]);
-    
-    s = 3; # Number of Radau stages
-    d = c_0.shape;
+def jac(t, c, k_rates=k_rates, c_hv=1):
+    k1, k2, k3 = k_rates
+    c_NO, c_NO2, c_O, c_O2, c_O3, c_M = c
 
-    # Stage derivatives K: shape (s, *c.shape)
-    K = np.zeros((s,) + d);
-    F = np.zeros_like(K);
+    J = np.zeros((6, 6))
 
-    # Initial guess: repeat the current derivative
-    for i in range(s):
-        K[i] = derivatives(c_0);
+    # d/d(NO) row
+    J[0, 0] = -k3 * c_O3
+    J[0, 1] = k1
+    J[0, 4] = -k3 * c_NO
 
-    for _ in range(max_runs):
-        for i in range(s):
-            c_i = c_0.copy();
-            for j in range(s):
-                c_i += dt * A[i, j] * K[j];
-            F[i] = derivatives(c_i);
-        error = np.linalg.norm(F-K);
-        if error < tol:
-            break;
-        else:
-            print ("Warning: Newton did not converge");
-        K[:] = F * 0.5 + K * 0.5;
-    c_new = c_0.copy();
-    for i in range(s):
-        c_new += dt * b[i] * K[i];
-    return c_new;
+    # d/d(NO2) row
+    J[1, 0] = k3 * c_O3
+    J[1, 1] = -k1
+    J[1, 4] = k3 * c_NO
 
-def radau_iia_solve (derivatives, c, c_M, t, dt):
-    """This function programmatically iterates through an array of times, t, given an initial concentration
-    matrix, c and spectator ion concentration, c_M.
+    # d/d(O) row
+    J[2, 1] = k1 * c_hv
+    J[2, 2] = -k2 * c_O2 * c_M
+    J[2, 3] = -k2 * c_O * c_M
+    J[2, 5] = -k2 * c_O * c_O2
+
+    # d/d(O2) row
+    J[3, 0] = -k3 * c_O3
+    J[3, 1] = k1
+    J[3, 2] = k2 * c_O2 * c_M
+    J[3, 3] = k2 * c_O * c_M
+    J[3, 4] = -k3 * c_NO
+    J[3, 5] = k2 * c_O * c_O2
+
+    # d/d(O3) row
+    J[4, 0] = -k3 * c_O3
+    J[4, 2] = k2 * c_O2 * c_M
+    J[4, 3] = k2 * c_O * c_M
+    J[4, 4] = -k3 * c_NO
+    J[4, 5] = k2 * c_O * c_O2
+
+    # d/d(M) row (always zero)
+    # already zero
+
+    return J
 
 
-    Args:
-        derivatives (function): derivative function for the gas concentrations
-        c (np.array): initial concentration array
-        c_M (float): spectator ion concentration
-        t (np.array): array of times
-        dt (float): timestep
-    """
-    c_temporal = np.zeros((6, len(t)));
-    c_temporal[:, 0] = c;
+c = np.array([ (4 - np.sqrt(6))/10, (4 + np.sqrt(6))/10, 1.0 ]);
+b = np.array([(16 - np.sqrt(6))/36, (16 + np.sqrt(6))/36, 1/9], dtype=float);
 
-    for i in range (1, len(t)):
-        c_temporal[:, i] = radau_iia_step(derivatives, c_temporal[:, i-1], c_M, dt);
-    return c_temporal;
+A = np.array([
+    [ 0.19681547722366, -0.06553542585020,  0.02377097434822],
+    [ 0.39442431473909,  0.29207341166523, -0.04154875212599],
+    [ 0.37640306270047,  0.51248582618842,  0.11111111111111]
+]);
 
-c_temporal = radau_iia_solve(derivatives, c_temporal[:, 0], M_0, t, dt);
+solveButcher = butcher.Butcher(A, b, c, derivatives, jac, c_temporal[:, 0], 0, 5, dt);
+c_temporal = solveButcher.calc();
 
 plt.plot(t, c_temporal[0, :], label="NO");
 plt.plot(t, c_temporal[1, :], label=f"$NO_2$");
