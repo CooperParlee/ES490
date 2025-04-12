@@ -7,7 +7,19 @@ Created on Fri March 21 12:59:08 2025
 
 import matplotlib.pyplot as plt;
 import numpy as np;
-from bisect import bisect;
+
+def cTrunc (array, factor):
+    """Function to truncate all values of a given array to the specified number of
+    decimal places.
+
+    Args:
+        array (np.array): array of values to truncate
+        factor (int): number of decimal places to truncate
+
+    Returns:
+        np.float64: truncated array.
+    """
+    return np.trunc(array * 10 ** factor) / 10**factor;
 
 #%% HW6.1 ds/dt = -2/5 * S(t): t in minutes, S0 = 1
 print("-=- HW6.1 -=-");
@@ -45,6 +57,7 @@ plt.legend();
 
 i = np.where(s_RK4 <= 0.001)[0][0]; # Search the RK4 array for the first index where s is 0.1%
 print(f"S=0.1% MDO: {str(t[i])} minutes");
+# S=0.1% MDO: 17.27 minutes
 
 #%% HW6.2
 print("-=- HW6.2 -=-");
@@ -184,8 +197,11 @@ plt.xlabel("System Frequency [rad/s]");
 plt.ylabel("Maximum Displacement [m]");
 vMax = vList[np.where(xMax == np.max(xMax))[0]][0];
 wMax = roadFreq(vMax, l);
-print(f"Maximum oscilation occurs at: {vMax} m/s");
-print(f"System resonant frequency: {wMax} rad/s");
+
+print(f"Maximum oscilation occurs at: {cTrunc(vMax, 2)} m/s");
+print(f"System resonant frequency: {cTrunc(wMax, 2)} rad/s");
+# Maximum oscilation occurs at: 5.101 m/s
+# System resonant frequency: 6.41 rad/s
 
 plt.show();
 
@@ -266,15 +282,11 @@ plt.show();
 # Unfortunately, as we can see with this graph, the function is not stable for reasonably
 # small step sizes. This means that it is necessary to use an implicit method instead.
 
-# %% Radau IIA Method
+# %% 6.3.2 Implicitly Solving the System of Differential Equations
 
-# These coefficients have been determined in the book Solving Ordinary Differential Equations II
-# by Hairer and Wanner, 1996. See here:
-# https://link.springer.com/book/10.1007/978-3-642-05221-7
+from scipy.integrate import solve_ivp;
 
-# Redefine c_temporal matrix with the initial conditions given.
-
-import butcher;
+print("-=- HW6.3 -=-");
 
 c_temporal[:, 0] = [
     NO_0,
@@ -285,69 +297,38 @@ c_temporal[:, 0] = [
     M_0,   
 ];
 
+soln = solve_ivp(derivatives, [0, 3 * 60], c_temporal[:, 0], method="LSODA");
 
+c_temporal = soln.y;
 
-def jac(t, c, k_rates=k_rates, c_hv=1):
-    k1, k2, k3 = k_rates
-    c_NO, c_NO2, c_O, c_O2, c_O3, c_M = c
+plt.plot(soln.t, c_temporal[0, :], label="NO");
+plt.plot(soln.t, c_temporal[1, :], label=f"$NO_2$");
+plt.plot(soln.t, c_temporal[2, :], label="O");
+# O2 concentration cannot reasonably be plotted because it's many orders of magnitude larger
+# than the other reduction products.
+#plt.plot(soln.t, c_temporal[3, :], label=f"$O_2$"); 
+plt.plot(soln.t, c_temporal[4, :], label=f"$O_3$");
 
-    J = np.zeros((6, 6))
+plt.title("Atmospheric NOx Reduction Products: \n Concentration until Equilibrium");
+plt.xlabel("Time [s]");
+plt.ylabel("Concentration [ppm]");
 
-    # d/d(NO) row
-    J[0, 0] = -k3 * c_O3
-    J[0, 1] = k1
-    J[0, 4] = -k3 * c_NO
+plt.legend();
 
-    # d/d(NO2) row
-    J[1, 0] = k3 * c_O3
-    J[1, 1] = -k1
-    J[1, 4] = k3 * c_NO
+c_final = c_temporal[:, -1];
 
-    # d/d(O) row
-    J[2, 1] = k1 * c_hv
-    J[2, 2] = -k2 * c_O2 * c_M
-    J[2, 3] = -k2 * c_O * c_M
-    J[2, 5] = -k2 * c_O * c_O2
+c_final = [
+    cTrunc(c_final[0], 4), # 4 decimals
+    cTrunc(c_final[1], 4), # 4 decimals
+    cTrunc(c_final[2], 12), # 8 decimals (it's very small)
+    cTrunc(c_final[3], 1), # 1 decimal
+    cTrunc(c_final[4], 4), # 4 decimals
+]; # truncate the concentration array for better presentation.
 
-    # d/d(O2) row
-    J[3, 0] = -k3 * c_O3
-    J[3, 1] = k1
-    J[3, 2] = k2 * c_O2 * c_M
-    J[3, 3] = k2 * c_O * c_M
-    J[3, 4] = -k3 * c_NO
-    J[3, 5] = k2 * c_O * c_O2
+print("Concentrations:")
+print(f"NO: {c_final[0]} NO2: {c_final[1]} O: {c_final[2]} 02: {c_final[3]} O3: {c_final[4]}")
 
-    # d/d(O3) row
-    J[4, 0] = -k3 * c_O3
-    J[4, 2] = k2 * c_O2 * c_M
-    J[4, 3] = k2 * c_O * c_M
-    J[4, 4] = -k3 * c_NO
-    J[4, 5] = k2 * c_O * c_O2
-
-    # d/d(M) row (always zero)
-    # already zero
-
-    return J
-
-
-c = np.array([ (4 - np.sqrt(6))/10, (4 + np.sqrt(6))/10, 1.0 ]);
-b = np.array([(16 - np.sqrt(6))/36, (16 + np.sqrt(6))/36, 1/9], dtype=float);
-
-A = np.array([
-    [ 0.19681547722366, -0.06553542585020,  0.02377097434822],
-    [ 0.39442431473909,  0.29207341166523, -0.04154875212599],
-    [ 0.37640306270047,  0.51248582618842,  0.11111111111111]
-]);
-
-solveButcher = butcher.Butcher(A, b, c, derivatives, jac, c_temporal[:, 0], 0, 5, dt);
-c_temporal = solveButcher.calc();
-
-plt.plot(t, c_temporal[0, :], label="NO");
-plt.plot(t, c_temporal[1, :], label=f"$NO_2$");
-plt.plot(t, c_temporal[2, :], label="O");
-plt.plot(t, c_temporal[3, :], label=f"$O_2$");
-plt.plot(t, c_temporal[4, :], label=f"$O_3s$");
+# Concentrations:
+# NO: 0.0369 NO2: 0.068 O: 0.0 02: 210000.1261 O3: 0.0369
 
 plt.show();
-
-# %%
