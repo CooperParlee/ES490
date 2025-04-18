@@ -1,0 +1,67 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "---\n",
+        "title: \"ES490 HW7: Numerical Solutions to PDEs\"\n",
+        "author: \"Cooper Parlee\"\n",
+        "date: \"4/13/2025\"\n",
+        "date-format: long\n",
+        "format: html\n",
+        "editor: visual\n",
+        "execute:\n",
+        "    echo: true\n",
+        "---\n",
+        "\n",
+        "## 7.1: Rod Parabolic Heat Equation\n",
+        "\n",
+        "It is given that the rate of heat transfer through a rod is given by:\n",
+        "\n",
+        "$$\\frac{k}{c\\rho}\\frac{\\partial^2 T}{\\partial x^2} = \\frac{\\partial T}{\\partial t}$$\n",
+        "\n",
+        "Where $k$ is the thermal conductivity, $c$ is the specific heat capacity, $\\rho$ is the density and $T(x,t)$ is the temperature of the rod at location $x$ and time $t$.\n",
+        "\n",
+        "For a second order central-difference scheme, this equation can be discretized as follows:\n",
+        "\n",
+        "$$\\frac{k}{c\\rho}\\frac{T_{i-1,j}-2T_{i,j}+T_{i+1,j}}{\\Delta x^2} = \\frac{T_{i,j+1} - T_{i,j}}{\\Delta t}$$\n",
+        "\n",
+        "Where $T_{i,j}$ corresponds to the temperature of a discrete point in the rod $i=x$ and $j=t$, so $i$ corresponds to the position along the rod at a given time $j$.\n",
+        "\n",
+        "Given that the author has learned his lesson about trying to build an implicit solver for solving ordinary differential equations from HW6, the solution to this equation will involve an explicit method. As such, to ensure that the solution remains numerically stable, the condition of $\\alpha < 0.5$ must be upheld. In context, $\\alpha$ is defined as follows:\n",
+        "\n",
+        "$$\\alpha = \\frac{k \\Delta t}{c\\rho \\Delta x^2}$$\n",
+        "\n",
+        "This means that $\\Delta x$ and $\\Delta t$ must be scaled in accordance with this constraint as all other variables will be given.\n",
+        "\n",
+        "Equation 2 is not in a form that can easily be solved numerically. However, the item of interest is $T_{i,j+1}$, or the temperature at the discrete point $i$ at a time $j+1$ at the next time step. Rearranging equation 2 and plugging in $\\alpha$:\n",
+        "\n",
+        "$$T_{i,j+1} = \\alpha T_{i-1,j} + (1-2\\alpha) T_{i,j} + \\alpha T_{i+1,j}$$\n",
+        "\n",
+        "### Solving for all values of T"
+      ],
+      "id": "bf0ed872"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "import numpy as np;\n"
+      ],
+      "id": "e837886b",
+      "execution_count": null,
+      "outputs": []
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "name": "python3",
+      "language": "python",
+      "display_name": "Python 3 (ipykernel)",
+      "path": "C:\\Users\\cparl\\AppData\\Roaming\\Python\\share\\jupyter\\kernels\\python3"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 5
+}

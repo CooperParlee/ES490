@@ -10,6 +10,7 @@ execute:
 ---
 
 ## 7.1: Rod Parabolic Heat Equation
+
 It is given that the rate of heat transfer through a rod is given by:
 
 $$\frac{k}{c\rho}\frac{\partial^2 T}{\partial x^2} = \frac{\partial T}{\partial t}$$
@@ -20,6 +21,7 @@ For a second order central-difference scheme, this equation can be discretized a
 
 $$\frac{k}{c\rho}\frac{T_{i-1,j}-2T_{i,j}+T_{i+1,j}}{\Delta x^2} = \frac{T_{i,j+1} - T_{i,j}}{\Delta t}$$
 
+Where $T_{i,j}$ corresponds to the temperature of a discrete point in the rod $i=x$ and $j=t$, so $i$ corresponds to the position along the rod at a given time $j$.
 
 Given that the author has learned his lesson about trying to build an implicit solver for solving ordinary differential equations from HW6, the solution to this equation will involve an explicit method. As such, to ensure that the solution remains numerically stable, the condition of $\alpha < 0.5$ must be upheld. In context, $\alpha$ is defined as follows:
 
@@ -27,8 +29,14 @@ $$\alpha = \frac{k \Delta t}{c\rho \Delta x^2}$$
 
 This means that $\Delta x$ and $\Delta t$ must be scaled in accordance with this constraint as all other variables will be given.
 
+Equation 2 is not in a form that can easily be solved numerically. However, the item of interest is $T_{i,j+1}$, or the temperature at the discrete point $i$ at a time $j+1$ at the next time step. Rearranging equation 2 and plugging in $\alpha$:
+
+$$T_{i,j+1} = \alpha T_{i-1,j} + (1-2\alpha) T_{i,j} + \alpha T_{i+1,j}$$
+
 ### Solving for all values of T
+
 ```{python}
 import numpy as np;
+
 
 ```
