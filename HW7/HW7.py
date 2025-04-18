@@ -13,15 +13,15 @@ from matplotlib.animation import FuncAnimation;
 l = 1;     # [m]
 k = 401;   # [W/m^2K]
 c = 0.386; # [J/gK]
-dx = 0.25;  # [m]
-dt = 0.00001; # [s]
+dx = 0.1;  # [m]
+dt = 5; # [s]
 rho = 8.96E6; # [g/m^3]
 
-t_max = 0.01;
+t_max = 30*60;
 
 x = np.arange(0, l + dx, dx);
 t = np.arange(0, t_max + dt, dt);
-alpha = k/c*dt/dx**2;
+alpha = k*dt/c/rho/dx**2;
 
 # Make sure alpha < 0.5
 if alpha > 0.5:
@@ -36,24 +36,41 @@ for j in range(len(t)-1):
     for i in range(1, len(x)-1):
         T[i, j + 1] = alpha * T[i-1, j] + (1-2*alpha)*T[i, j] + alpha * T[i+1, j];
 
-fig, ax = plt.subplots();
-line, = ax.plot([], [], lw=2);
-ax.set_xlim(x[0], x[-1]);
-ax.set_ylim(np.min(T), np.max(T));
-ax.set_xlabel('Position [m]');
-ax.set_ylabel('Temperature [C]');
+X, Tm = np.meshgrid(t, x);
 
-title = ax.set_title('Time = 0.00 s');
+fig = plt.figure();
+ax = fig.add_subplot(111, projection="3d");
 
-def init():
-    line.set_data([], []);
-    return line, title;
+surf = ax.plot_surface(X, Tm, T, cmap="hot");
 
-def update (frame):
-    line.set_data(x, T[:, frame]);
-    ax.set_title(f'Time = {t[frame]:-2f} s');
-    return line, title;
+ax.set_title("HW 7.1a: Parabolic PDE Bar Conduction");
+ax.set_xlabel("Time [s]");
+ax.set_ylabel("Position [m]");
+ax.set_zlabel("Temperature [C]");
 
-animation = FuncAnimation(fig, update, frames=len(t), init_func=init, blit=False, interval=50);
+fig.colorbar(surf, ax=ax, shrink=0.5, aspect=10);
+
+plt.show();
+#%% 7.1b Derivative = 0 Boundary Condition
+T = np.zeros((len(x), len(t)));
+T[0, :] = 150;
+T[-1, :] = 0;
+
+for j in range(len(t)-1):
+    for i in range(1, len(x)-1):
+        T[i, j + 1] = alpha * T[i-1, j] + (1-2*alpha)*T[i, j] + alpha * T[i+1, j];
+    T[-1, j] = T[-2, j];
+
+fig = plt.figure();
+ax = fig.add_subplot(111, projection="3d");
+
+surf = ax.plot_surface(X, Tm, T, cmap="hot");
+
+ax.set_title("HW 7.1b: Derivative Boundary Condition");
+ax.set_xlabel("Time [s]");
+ax.set_ylabel("Position [m]");
+ax.set_zlabel("Temperature [C]");
+
+fig.colorbar(surf, ax=ax, shrink=0.5, aspect=10);
 
 plt.show();
