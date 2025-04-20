@@ -74,3 +74,63 @@ ax.set_zlabel("Temperature [C]");
 fig.colorbar(surf, ax=ax, shrink=0.5, aspect=10);
 
 plt.show();
+
+#%% HW 7.2 Greenhouse Problem
+
+g_l = 20 * 0.3048; #         [m]
+g_w = 10 * 0.3048; #         [m]
+g_hnorth = 10 * 0.3048; #    [m]
+g_hsouth = 6 * 0.3048; #     [m]
+c_thick = 6/12 * 0.3048;  #  [m]
+
+
+# b
+rho_floor = 2300; # [kg/m^3]
+m_floor = g_w * g_l * c_thick * rho_floor; # [kg]
+
+rho_air = 1.293; #[kg/m^3]
+m_air = g_w * g_l * (g_hnorth + g_hsouth)/2 * rho_air; # [kg]
+
+m_water = 50; #[kg] starting guess for water mass
+
+c_water =       4.184e3;   # [J/kg-K]
+c_air =         1.0035e3;  # [J/kg-K]
+c_concrete =    0.950e3;   # [J/kg-K]
+
+
+a_tanks = g_hnorth * g_l; # [m^2]
+a_glass = (np.sqrt((g_hnorth - g_hsouth)**2 + g_w**2)*g_l # roof area
+        + g_hsouth * g_l # south side area
+        + (g_hnorth + g_hsouth)*g_w); # side trapezoid areas
+a_water = g_hnorth * g_l; # [m^2] assume tank is as tall as roof
+
+u_glass = 5.5; # [W/m^2-K]
+h_air = 15; # [W/m^2-K]
+
+# d
+#Time varying outdoor temperature [degC] (32 to -4 degF)
+Tout = 10 * np.sin(2 * np.pi / 86400 * t - np.pi) - 10;
+
+#%% 7.2e Solar Energy Function
+
+from SolarEnergy import SolarEnergy;
+
+#qsolar water [W/m2]
+beta = 90
+n = np.arange(1, 8, 1);
+Wabs=np.zeros([len(n),len(ct)])
+
+W = 882; # [W/m^2]
+gamma = 0;
+numSamples = 501;
+ct=np.linspace(0, 24, numSamples)
+
+for i in range(len(n)):
+    Wabs[i,:] = SolarEnergy(W,beta,gamma,Lat,Long,Lst,n[i],ct)
+    qsolarw=Wabs[0,:]
+    if sun==1: #sun is out every day
+        for j in range(1,len(n)):
+            qsolarw=np.concatenate((qsolarw,Wabs[j,1:]))
+    else: #sun is only out for the first day
+        for j in range(1,len(n)):
+            qsolarw=np.concatenate((qsolarw,np.zeros(len(ct)-1)))
