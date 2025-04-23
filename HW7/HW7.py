@@ -98,7 +98,7 @@ c_air =         1.0035e3;  # [J/kg-K]
 c_concrete =    0.950e3;   # [J/kg-K]
 
 
-a_tanks = g_hnorth * g_l; # [m^2]
+a_concrete = g_w * g_l; # [m^2]
 a_glass = (np.sqrt((g_hnorth - g_hsouth)**2 + g_w**2)*g_l # roof area
         + g_hsouth * g_l # south side area
         + (g_hnorth + g_hsouth)*g_w); # side trapezoid areas
@@ -109,7 +109,9 @@ h_air = 15; # [W/m^2-K]
 
 # d
 #Time varying outdoor temperature [degC] (32 to -4 degF)
-Tout = 10 * np.sin(2 * np.pi / 86400 * t - np.pi) - 10;
+
+def Tout (t):
+    return 10 * np.sin(2 * np.pi / 86400 * t - np.pi) - 10;
 
 #%% 7.2e Solar Energy Function
 
@@ -118,14 +120,17 @@ from SolarEnergy import SolarEnergy;
 W = 882; # [W/m^2]
 gamma = 0;
 numSamples = 501;
-ct=np.linspace(0, 24, numSamples)
+ct=np.linspace(0, 24, numSamples);
+dt = 24/numSamples * 3600; # [s]
 
 #qsolar water [W/m2]
 beta_concrete = 90;
 beta_water = 0;
 n = np.arange(1, 8, 1);
 
-def solarPwr (beta, sun):
+n_exch = 1.44 / 3600; # [#] of exchanges per hour converted into exchanges per second
+
+def solarPwr (beta, sun, n, ct):
     # From HW3:
     gamma = 0;      # [Deg]
     lat = 44.3889;  # [Deg]    
@@ -146,5 +151,44 @@ def solarPwr (beta, sun):
 
     return Wabs;
 
-Wabs_water = solarPwr(beta_water, 1);
-Wabs_concrete = solarPwr(beta_concrete, 1);
+def greenhouseDerivatives (t, y, q_water, q_concrete):
+        T_f, T_w, T_a = y;
+        
+
+        T_outside = Tout(t);
+
+        # Solve for the delta-T for draft
+        dT_air_exch = m_air * c_air * n_exch * (T_a - T_outside);
+
+        return [
+            # For the floor:
+            (q_concrete*a_concrete - h_air * a_concrete * (T_f - T_a))/m_floor/c_concrete,
+            # For the water:
+            (q_water * a_water - h_air * a_water * (T_w - T_a))/m_water/c_water,
+            # For the air:
+            (h_air * a_water * (T_f - T_a) + 
+            h_air * a_water * (T_w - T_a) - 
+            u_glass * a_glass * (T_a - T_outside) - 
+            dT_air_exch)/m_air/c_air,
+        ];
+
+Wabs_water = solarPwr(beta_water, 1, n, ct);
+Wabs_concrete = solarPwr(beta_concrete, 1, n, ct);
+
+T_temporal = np.zeros((3, len(ct) * len(n)));
+
+T_temporal[:, 0] = 18; # Start everything off at 18*C
+for day in n:
+    for i in len(ct)-1:
+        k1 = greenhouseDerivatives(ct[i], T_temporal[:, i], Wabs_water[n, i]);
+        k2 = greenhouseDerivatives(ct[i] + dt/2, T_temporal[:, i] + k1 * dt/2, Wabs_water[n, i]);
+        k3 = greenhouseDerivatives(ct[i] + dt/2, T_temporal[:, i] + k2 * dt/2, Wabs_water[n, i]);
+        k4 = greenhouseDerivatives(ct[i] + dt, T_temporal[:, i] + k3 * dt, Wabs_water[n, i]);
+
+        T_temporal[:, i+1] = T_temporal[:, i] + (k1 + 2*k2 + 2*k3 + k4)/6;
+
+t = np.arange(0, 5, dt);
+
+plt.plot(t, T_temporal[0, :], label="NO");
+plt.plot(t, T_temporal[1, :], label=f"$NO_2$");
+plt.plot(t, T_temporal[2, :], label="O");
