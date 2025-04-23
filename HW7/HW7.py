@@ -115,22 +115,36 @@ Tout = 10 * np.sin(2 * np.pi / 86400 * t - np.pi) - 10;
 
 from SolarEnergy import SolarEnergy;
 
-#qsolar water [W/m2]
-beta = 90
-n = np.arange(1, 8, 1);
-Wabs=np.zeros([len(n),len(ct)])
-
 W = 882; # [W/m^2]
 gamma = 0;
 numSamples = 501;
 ct=np.linspace(0, 24, numSamples)
 
-for i in range(len(n)):
-    Wabs[i,:] = SolarEnergy(W,beta,gamma,Lat,Long,Lst,n[i],ct)
-    qsolarw=Wabs[0,:]
-    if sun==1: #sun is out every day
-        for j in range(1,len(n)):
-            qsolarw=np.concatenate((qsolarw,Wabs[j,1:]))
-    else: #sun is only out for the first day
-        for j in range(1,len(n)):
-            qsolarw=np.concatenate((qsolarw,np.zeros(len(ct)-1)))
+#qsolar water [W/m2]
+beta_concrete = 90;
+beta_water = 0;
+n = np.arange(1, 8, 1);
+
+def solarPwr (beta, sun):
+    # From HW3:
+    gamma = 0;      # [Deg]
+    lat = 44.3889;  # [Deg]    
+    long = 68.7990; # [Deg]    
+    lst = 75;       # [Deg] 
+    
+    Wabs=np.zeros([len(n),len(ct)])
+
+    for i in range(len(n)):
+        Wabs[i,:] = SolarEnergy(W,beta,gamma,lat,long,lst,n[i],ct)
+        qsolarw=Wabs[0,:]
+        if sun==1: #sun is out every day
+            for j in range(1,len(n)):
+                qsolarw=np.concatenate((qsolarw,Wabs[j,1:]))
+        else: #sun is only out for the first day
+            for j in range(1,len(n)):
+                qsolarw=np.concatenate((qsolarw,np.zeros(len(ct)-1)))
+
+    return Wabs;
+
+Wabs_water = solarPwr(beta_water, 1);
+Wabs_concrete = solarPwr(beta_concrete, 1);
