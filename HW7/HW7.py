@@ -91,7 +91,7 @@ m_floor = g_w * g_l * c_thick * rho_floor; # [kg]
 rho_air = 1.293; #[kg/m^3]
 m_air = g_w * g_l * (g_hnorth + g_hsouth)/2 * rho_air; # [kg]
 
-m_water = 50; #[kg] starting guess for water mass
+m_water = 100; #[kg] starting guess for water mass
 
 c_water =       4.184e3;   # [J/kg-K]
 c_air =         1.0035e3;  # [J/kg-K]
@@ -126,7 +126,7 @@ dt = 24/numSamples * 3600; # [s]
 #qsolar water [W/m2]
 beta_concrete = 90;
 beta_water = 0;
-n = np.arange(1, 8, 1);
+n = np.arange(0, 8, 1);
 
 n_exch = 1.44 / 3600; # [#] of exchanges per hour converted into exchanges per second
 
@@ -160,7 +160,7 @@ def greenhouseDerivatives (t, y, q_water, q_concrete):
         # Solve for the delta-T for draft
         dT_air_exch = m_air * c_air * n_exch * (T_a - T_outside);
 
-        return [
+        return np.array([
             # For the floor:
             (q_concrete*a_concrete - h_air * a_concrete * (T_f - T_a))/m_floor/c_concrete,
             # For the water:
@@ -170,25 +170,36 @@ def greenhouseDerivatives (t, y, q_water, q_concrete):
             h_air * a_water * (T_w - T_a) - 
             u_glass * a_glass * (T_a - T_outside) - 
             dT_air_exch)/m_air/c_air,
-        ];
+        ]);
 
 Wabs_water = solarPwr(beta_water, 1, n, ct);
 Wabs_concrete = solarPwr(beta_concrete, 1, n, ct);
 
-T_temporal = np.zeros((3, len(ct) * len(n)));
+#plt.plot(ct, Wabs_water[1, :]);
+#plt.plot(ct, Wabs_concrete[1, :]);
+#
+#plt.show();
+
+T_temporal = np.zeros((3, len(ct) * len(n)-6));
 
 T_temporal[:, 0] = 18; # Start everything off at 18*C
 for day in n:
-    for i in len(ct)-1:
-        k1 = greenhouseDerivatives(ct[i], T_temporal[:, i], Wabs_water[n, i]);
-        k2 = greenhouseDerivatives(ct[i] + dt/2, T_temporal[:, i] + k1 * dt/2, Wabs_water[n, i]);
-        k3 = greenhouseDerivatives(ct[i] + dt/2, T_temporal[:, i] + k2 * dt/2, Wabs_water[n, i]);
-        k4 = greenhouseDerivatives(ct[i] + dt, T_temporal[:, i] + k3 * dt, Wabs_water[n, i]);
+    print(day);
+    for i in range(len(ct)):
+        i_t = i + day * (numSamples-1);
+        
+        k1 = greenhouseDerivatives(ct[i], T_temporal[:, i_t], Wabs_water[day, i], Wabs_concrete[day, i]);
+        k2 = greenhouseDerivatives(ct[i] + dt/2, T_temporal[:, i_t] + k1 * dt/2, Wabs_water[day, i], Wabs_concrete[day, i]);
+        k3 = greenhouseDerivatives(ct[i] + dt/2, T_temporal[:, i_t] + k2 * dt/2, Wabs_water[day, i], Wabs_concrete[day, i]);
+        k4 = greenhouseDerivatives(ct[i] + dt, T_temporal[:, i_t] + k3 * dt, Wabs_water[day, i], Wabs_concrete[day, i]);
 
-        T_temporal[:, i+1] = T_temporal[:, i] + (k1 + 2*k2 + 2*k3 + k4)/6;
+        T_temporal[:, i_t + 1] = T_temporal[:, i_t] + (k1 + 2*k2 + 2*k3 + k4)/6;
 
-t = np.arange(0, 5, dt);
+t = np.linspace(0, len(n), len(T_temporal[0, :]));
 
-plt.plot(t, T_temporal[0, :], label="NO");
-plt.plot(t, T_temporal[1, :], label=f"$NO_2$");
-plt.plot(t, T_temporal[2, :], label="O");
+plt.plot(t, T_temporal[0, :], label="Floor");
+plt.plot(t, T_temporal[1, :], label=f"Water");
+plt.plot(t, T_temporal[2, :], label="Air");
+plt.legend();
+
+plt.show();
