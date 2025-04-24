@@ -85,17 +85,18 @@ c_thick = 6/12 * 0.3048;  #  [m]
 
 
 # b
-rho_floor = 2300; # [kg/m^3]
+rho_floor = 2200; # [kg/m^3]
 m_floor = g_w * g_l * c_thick * rho_floor; # [kg]
 
-rho_air = 1.293; #[kg/m^3]
+rho_air = 1.225; #[kg/m^3]
 m_air = g_w * g_l * (g_hnorth + g_hsouth)/2 * rho_air; # [kg]
+print(m_air);
 
-m_water = 100; #[kg] starting guess for water mass
+m_water = 1000; #[kg] starting guess for water mass
 
-c_water =       4.184e3;   # [J/kg-K]
-c_air =         1.0035e3;  # [J/kg-K]
-c_concrete =    0.950e3;   # [J/kg-K]
+c_water =       4182;   # [J/kg-K]
+c_air =         1000;  # [J/kg-K]
+c_concrete =    950;   # [J/kg-K]
 
 
 a_concrete = g_w * g_l; # [m^2]
@@ -105,7 +106,7 @@ a_glass = (np.sqrt((g_hnorth - g_hsouth)**2 + g_w**2)*g_l # roof area
 a_water = g_hnorth * g_l; # [m^2] assume tank is as tall as roof
 
 u_glass = 5.5; # [W/m^2-K]
-h_air = 15; # [W/m^2-K]
+h_air = 10; # [W/m^2-K]
 
 # d
 #Time varying outdoor temperature [degC] (32 to -4 degF)
@@ -113,20 +114,21 @@ h_air = 15; # [W/m^2-K]
 def Tout (t):
     return 10 * np.sin(2 * np.pi / 86400 * t - np.pi) - 10;
 
-#%% 7.2e Solar Energy Function
+#%% 7.2e-f Solving System: Sun Out Everyday
 
 from SolarEnergy import SolarEnergy;
 
 W = 882; # [W/m^2]
 gamma = 0;
-numSamples = 501;
+numSamples = 1440;
 ct=np.linspace(0, 24, numSamples);
 dt = 24/numSamples * 3600; # [s]
 
 #qsolar water [W/m2]
-beta_concrete = 90;
-beta_water = 0;
-n = np.arange(0, 8, 1);
+beta_concrete = 0;
+beta_water = 90;
+days = 7;
+n = np.arange(0, days, 1);
 
 n_exch = 1.44 / 3600; # [#] of exchanges per hour converted into exchanges per second
 
@@ -139,15 +141,13 @@ def solarPwr (beta, sun, n, ct):
     
     Wabs=np.zeros([len(n),len(ct)])
 
-    for i in range(len(n)):
-        Wabs[i,:] = SolarEnergy(W,beta,gamma,lat,long,lst,n[i],ct)
-        qsolarw=Wabs[0,:]
+    # day, time
+    Wabs[0,:] = SolarEnergy(W,beta,gamma,lat,long,lst,n[0],ct)
+    for i in range(1, len(n)):
         if sun==1: #sun is out every day
-            for j in range(1,len(n)):
-                qsolarw=np.concatenate((qsolarw,Wabs[j,1:]))
+            Wabs[i,:] = SolarEnergy(W,beta,gamma,lat,long,lst,n[i],ct)
         else: #sun is only out for the first day
-            for j in range(1,len(n)):
-                qsolarw=np.concatenate((qsolarw,np.zeros(len(ct)-1)))
+            Wabs[i,:] = 0;
 
     return Wabs;
 
@@ -166,25 +166,19 @@ def greenhouseDerivatives (t, y, q_water, q_concrete):
             # For the water:
             (q_water * a_water - h_air * a_water * (T_w - T_a))/m_water/c_water,
             # For the air:
-            (h_air * a_water * (T_f - T_a) + 
+            (h_air * a_concrete * (T_f - T_a) + 
             h_air * a_water * (T_w - T_a) - 
-            u_glass * a_glass * (T_a - T_outside) - 
+            u_glass * a_glass * (T_a - Tout(t)) - 
             dT_air_exch)/m_air/c_air,
         ]);
 
 Wabs_water = solarPwr(beta_water, 1, n, ct);
 Wabs_concrete = solarPwr(beta_concrete, 1, n, ct);
 
-#plt.plot(ct, Wabs_water[1, :]);
-#plt.plot(ct, Wabs_concrete[1, :]);
-#
-#plt.show();
+T_temporal = np.zeros((3, (numSamples) * days-5));
 
-T_temporal = np.zeros((3, len(ct) * len(n)-6));
-
-T_temporal[:, 0] = 18; # Start everything off at 18*C
+T_temporal[:, 0] = [22, 65, 20]; # Changed these values after temperature converged, was 10*C
 for day in n:
-    print(day);
     for i in range(len(ct)):
         i_t = i + day * (numSamples-1);
         
@@ -193,13 +187,59 @@ for day in n:
         k3 = greenhouseDerivatives(ct[i] + dt/2, T_temporal[:, i_t] + k2 * dt/2, Wabs_water[day, i], Wabs_concrete[day, i]);
         k4 = greenhouseDerivatives(ct[i] + dt, T_temporal[:, i_t] + k3 * dt, Wabs_water[day, i], Wabs_concrete[day, i]);
 
-        T_temporal[:, i_t + 1] = T_temporal[:, i_t] + (k1 + 2*k2 + 2*k3 + k4)/6;
+        T_temporal[:, i_t + 1] = T_temporal[:, i_t] + (k1 + 2*k2 + 2*k3 + k4)/6 * dt;
 
-t = np.linspace(0, len(n), len(T_temporal[0, :]));
+t = np.linspace(0, days, len(T_temporal[0, :]));
 
 plt.plot(t, T_temporal[0, :], label="Floor");
-plt.plot(t, T_temporal[1, :], label=f"Water");
+plt.plot(t, T_temporal[1, :], label="Water");
 plt.plot(t, T_temporal[2, :], label="Air");
+
+plt.title("Greenhouse Temperatures for Sunlit Case");
+plt.xlabel("Day");
+plt.ylabel(f"Temperature (\N{DEGREE SIGN}C)");
 plt.legend();
+plt.grid(True);
 
 plt.show();
+# 7.2e-g initial water needed: 1000kg ish
+
+#%% 7.2h Sun Out 1 Day for 3 days (Typical Maine)
+m_water = 4500;
+
+days = 3;
+n = np.arange(0, days, 1);
+
+Wabs_water = solarPwr(beta_water, 0, n, ct);
+Wabs_concrete = solarPwr(beta_concrete, 0, n, ct);
+
+T_temporal = np.zeros((3, (numSamples) * days-1));
+
+T_temporal[:, 0] = [22, 65, 20]; # Previous equilibrium
+for day in n:
+    for i in range(len(ct)):
+        i_t = i + day * (numSamples-1);
+        
+        k1 = greenhouseDerivatives(ct[i], T_temporal[:, i_t], Wabs_water[day, i], Wabs_concrete[day, i]);
+        k2 = greenhouseDerivatives(ct[i] + dt/2, T_temporal[:, i_t] + k1 * dt/2, Wabs_water[day, i], Wabs_concrete[day, i]);
+        k3 = greenhouseDerivatives(ct[i] + dt/2, T_temporal[:, i_t] + k2 * dt/2, Wabs_water[day, i], Wabs_concrete[day, i]);
+        k4 = greenhouseDerivatives(ct[i] + dt, T_temporal[:, i_t] + k3 * dt, Wabs_water[day, i], Wabs_concrete[day, i]);
+
+        T_temporal[:, i_t + 1] = T_temporal[:, i_t] + (k1 + 2*k2 + 2*k3 + k4)/6 * dt;
+
+t = np.linspace(0, days, len(T_temporal[0, :]));
+
+plt.plot(t, T_temporal[0, :], label="Floor");
+plt.plot(t, T_temporal[1, :], label="Water");
+plt.plot(t, T_temporal[2, :], label="Air");
+
+plt.title("Greenhouse Temperatures for Dreary Maine Case");
+plt.xlabel("Day");
+plt.ylabel(f"Temperature (\N{DEGREE SIGN}C)");
+
+plt.legend();
+plt.grid(True);
+
+plt.show();
+
+# m = 4500 kg
